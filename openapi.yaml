@@ -1,0 +1,198 @@
+openapi: 3.1.0
+info:
+  title: Visto Azul API
+  version: "1.0.0"
+  description: |
+    API REST para enviar e automatizar o WhatsApp via Visto Azul.
+    Autenticação por API key (Bearer). O motor de WhatsApp fica escondido atrás do gateway.
+    Documentação completa: https://vistoazul.com.br/docs
+  contact:
+    name: Visto Azul
+    url: https://vistoazul.com.br
+servers:
+  - url: https://dashboard.vistoazul.com.br/api/v1
+security:
+  - bearerAuth: []
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: Use sua API key. Header Authorization: Bearer SUA_API_KEY.
+paths:
+  /instances:
+    get:
+      summary: Lista as instâncias (números conectados) da conta
+      responses:
+        "200": { description: OK }
+        "401": { description: API key ausente ou inválida }
+    post:
+      summary: Cria uma instância (devolve o QR code para conectar)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, example: vendas }
+      responses:
+        "201": { description: Criada }
+        "403": { description: Limite do plano atingido }
+  /messages/text:
+    post:
+      summary: Envia uma mensagem de texto
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [instance, number, text]
+              properties:
+                instance: { type: string, example: vendas }
+                number: { type: string, example: "5511999999999" }
+                text: { type: string, example: "Olá!" }
+      responses:
+        "200": { description: Enviada }
+  /wa/send/media:
+    post:
+      summary: Envia mídia (imagem, vídeo ou documento) com legenda
+      parameters:
+        - in: header
+          name: X-Instance
+          schema: { type: string }
+          description: Nome da instância (se houver mais de uma)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [number, type, file]
+              properties:
+                number: { type: string }
+                type: { type: string, enum: [image, video, document] }
+                file: { type: string, description: URL pública do arquivo }
+                text: { type: string, description: legenda (opcional) }
+      responses:
+        "200": { description: Enviada }
+  /wa/send/request-payment:
+    post:
+      summary: Envia uma cobrança PIX na conversa
+      parameters:
+        - in: header
+          name: X-Instance
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [number, amount, pixKey, pixType]
+              properties:
+                number: { type: string }
+                amount: { type: number, example: 97.00 }
+                pixKey: { type: string }
+                pixType: { type: string, enum: [email, cpf, cnpj, phone, random] }
+                title: { type: string }
+                text: { type: string }
+                itemName: { type: string }
+      responses:
+        "200": { description: Enviada }
+  /wa/chat/check:
+    post:
+      summary: Verifica quais números têm WhatsApp (anti-ban)
+      parameters:
+        - in: header
+          name: X-Instance
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [numbers]
+              properties:
+                numbers: { type: array, items: { type: string } }
+      responses:
+        "200": { description: OK }
+  /campaigns:
+    post:
+      summary: Cria uma campanha (disparo em massa com anti-ban)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [instances, template, recipients]
+              properties:
+                instances: { type: array, items: { type: string } }
+                template: { type: string, description: "spintax {a|b} e variáveis {{nome}}" }
+                recipients:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      number: { type: string }
+                      vars: { type: object, additionalProperties: { type: string } }
+                minDelayMs: { type: integer, example: 8000 }
+                maxDelayMs: { type: integer, example: 40000 }
+                scheduledForMs: { type: integer, description: "epoch ms; futuro = agendada" }
+      responses:
+        "201": { description: Criada, devolve campaignId }
+  /campaigns/{id}:
+    get:
+      summary: Status de uma campanha
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: OK }
+        "404": { description: Não encontrada }
+  /contacts:
+    get:
+      summary: Lista contatos (filtra por tag com ?tag=)
+      responses:
+        "200": { description: OK }
+    post:
+      summary: Cria ou atualiza um contato
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [number]
+              properties:
+                number: { type: string }
+                name: { type: string }
+                tags: { type: array, items: { type: string } }
+      responses:
+        "201": { description: OK }
+  /instances/{instance}/webhook:
+    post:
+      summary: Configura o webhook para receber mensagens
+      parameters:
+        - in: path
+          name: instance
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [url]
+              properties:
+                url: { type: string, example: "https://seu-sistema.com/webhook" }
+                enabled: { type: boolean, example: true }
+      responses:
+        "200": { description: Configurado }
