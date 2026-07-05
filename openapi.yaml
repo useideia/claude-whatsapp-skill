@@ -4,7 +4,7 @@ info:
   version: "1.0.0"
   description: |
     API REST para enviar e automatizar o WhatsApp via Visto Azul.
-    Autenticação por API key (Bearer). O motor de WhatsApp fica escondido atrás do gateway.
+    Autenticação por API key (Bearer). Toda a complexidade do WhatsApp fica encapsulada na API.
     Documentação completa: https://vistoazul.com.br/docs
   contact:
     name: Visto Azul
