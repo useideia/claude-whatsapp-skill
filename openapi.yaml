@@ -3,8 +3,13 @@ info:
   title: Visto Azul API
   version: "1.0.0"
   description: |
-    API REST para enviar e automatizar o WhatsApp via Visto Azul.
-    Autenticação por API key (Bearer). Toda a complexidade do WhatsApp fica encapsulada na API.
+    API REST para enviar e automatizar o WhatsApp via Visto Azul: texto, mídia,
+    cobrança PIX, enquetes, campanhas em massa com anti-ban, grupos, funil de grupos,
+    contatos e webhooks. Autenticação por API key (Bearer). Sem taxa por mensagem da Meta.
+
+    Importe este arquivo no Postman, Insomnia, no HTTP Request do n8n ou em qualquer
+    agente de IA para operar a API automaticamente.
+
     Documentação completa: https://vistoazul.com.br/docs
   contact:
     name: Visto Azul
@@ -13,20 +18,42 @@ servers:
   - url: https://dashboard.vistoazul.com.br/api/v1
 security:
   - bearerAuth: []
+tags:
+  - name: Instâncias
+  - name: Mensagens
+  - name: Recursos avançados
+  - name: Campanhas
+  - name: Contatos
+  - name: Funil de grupos
+  - name: Webhooks
 components:
   securitySchemes:
     bearerAuth:
       type: http
       scheme: bearer
-      description: Use sua API key. Header Authorization: Bearer SUA_API_KEY.
+      description: "Use sua API key. Header Authorization: Bearer SUA_API_KEY."
+  parameters:
+    XInstance:
+      in: header
+      name: X-Instance
+      required: false
+      schema: { type: string }
+      description: Nome da instância (omita se houver só um número na conta).
+  responses:
+    Unauthorized:
+      description: API key ausente ou inválida
+    PaymentRequired:
+      description: Assinatura inativa
 paths:
   /instances:
     get:
+      tags: [Instâncias]
       summary: Lista as instâncias (números conectados) da conta
       responses:
         "200": { description: OK }
-        "401": { description: API key ausente ou inválida }
+        "401": { $ref: "#/components/responses/Unauthorized" }
     post:
+      tags: [Instâncias]
       summary: Cria uma instância (devolve o QR code para conectar)
       requestBody:
         required: true
@@ -40,8 +67,30 @@ paths:
       responses:
         "201": { description: Criada }
         "403": { description: Limite do plano atingido }
+  /instances/{instance}/webhook:
+    post:
+      tags: [Webhooks]
+      summary: Configura o webhook para receber eventos no seu endpoint
+      parameters:
+        - in: path
+          name: instance
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [url]
+              properties:
+                url: { type: string, example: "https://seu-sistema.com/webhook" }
+                enabled: { type: boolean, example: true }
+      responses:
+        "200": { description: Configurado }
   /messages/text:
     post:
+      tags: [Mensagens]
       summary: Envia uma mensagem de texto
       requestBody:
         required: true
@@ -56,14 +105,135 @@ paths:
                 text: { type: string, example: "Olá!" }
       responses:
         "200": { description: Enviada }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /messages/media:
+    post:
+      tags: [Mensagens]
+      summary: Baixa a mídia de uma mensagem recebida (base64 + transcrição de áudio)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [instance, id]
+              properties:
+                instance: { type: string, example: vendas }
+                id: { type: string, description: "id da mensagem (vem no webhook)" }
+                transcribe: { type: boolean, description: "transcreve áudio para texto" }
+                generateMp3: { type: boolean }
+                downloadQuoted: { type: boolean }
+      responses:
+        "200": { description: "OK — { base64, mimetype, transcription }" }
+  /messages/read:
+    post:
+      tags: [Mensagens]
+      summary: Marca mensagem(ns) como lida(s)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [instance]
+              properties:
+                instance: { type: string }
+                id: { type: string }
+                ids: { type: array, items: { type: string } }
+      responses:
+        "200": { description: OK }
+  /messages/presence:
+    post:
+      tags: [Mensagens]
+      summary: Envia presença na conversa (digitando / gravando)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [instance, number, presence]
+              properties:
+                instance: { type: string }
+                number: { type: string }
+                presence: { type: string, enum: [composing, recording, paused] }
+                delay: { type: integer, description: "ms (máx 5min)" }
+      responses:
+        "200": { description: OK }
+  /messages/react:
+    post:
+      tags: [Mensagens]
+      summary: Reage a uma mensagem com emoji ("" remove)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [instance, number, id]
+              properties:
+                instance: { type: string }
+                number: { type: string }
+                id: { type: string }
+                emoji: { type: string }
+      responses:
+        "200": { description: OK }
+  /messages/edit:
+    post:
+      tags: [Mensagens]
+      summary: Edita uma mensagem enviada
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [instance, id, text]
+              properties:
+                instance: { type: string }
+                id: { type: string }
+                text: { type: string }
+      responses:
+        "200": { description: OK }
+  /messages/delete:
+    post:
+      tags: [Mensagens]
+      summary: Apaga uma mensagem para todos
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [instance, id]
+              properties:
+                instance: { type: string }
+                id: { type: string }
+      responses:
+        "200": { description: OK }
+  /wa/send/text:
+    post:
+      tags: [Recursos avançados]
+      summary: Texto (com opções avançadas)
+      parameters: [{ $ref: "#/components/parameters/XInstance" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [number, text]
+              properties:
+                number: { type: string }
+                text: { type: string }
+                mentions: { type: array, items: { type: string } }
+      responses:
+        "200": { description: Enviada }
   /wa/send/media:
     post:
+      tags: [Recursos avançados]
       summary: Envia mídia (imagem, vídeo ou documento) com legenda
-      parameters:
-        - in: header
-          name: X-Instance
-          schema: { type: string }
-          description: Nome da instância (se houver mais de uma)
+      parameters: [{ $ref: "#/components/parameters/XInstance" }]
       requestBody:
         required: true
         content:
@@ -78,13 +248,31 @@ paths:
                 text: { type: string, description: legenda (opcional) }
       responses:
         "200": { description: Enviada }
+  /wa/send/menu:
+    post:
+      tags: [Recursos avançados]
+      summary: Envia uma enquete (poll)
+      parameters: [{ $ref: "#/components/parameters/XInstance" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [number, type, text, choices]
+              properties:
+                number: { type: string }
+                type: { type: string, enum: [poll], example: poll }
+                text: { type: string, example: "Qual horário?" }
+                choices: { type: array, items: { type: string }, example: ["Manhã", "Tarde"] }
+                selectableCount: { type: integer, example: 1 }
+      responses:
+        "200": { description: Enviada }
   /wa/send/request-payment:
     post:
+      tags: [Recursos avançados]
       summary: Envia uma cobrança PIX na conversa
-      parameters:
-        - in: header
-          name: X-Instance
-          schema: { type: string }
+      parameters: [{ $ref: "#/components/parameters/XInstance" }]
       requestBody:
         required: true
         content:
@@ -102,13 +290,32 @@ paths:
                 itemName: { type: string }
       responses:
         "200": { description: Enviada }
+  /wa/sender/simple:
+    post:
+      tags: [Recursos avançados]
+      summary: Envio ou agendamento em lote (com anti-ban)
+      parameters: [{ $ref: "#/components/parameters/XInstance" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [numbers, type, text]
+              properties:
+                numbers: { type: array, items: { type: string } }
+                type: { type: string, example: text }
+                text: { type: string }
+                delayMin: { type: integer, example: 8 }
+                delayMax: { type: integer, example: 40 }
+                scheduled_for: { type: integer, description: "epoch ms (opcional)" }
+      responses:
+        "200": { description: OK }
   /wa/chat/check:
     post:
+      tags: [Recursos avançados]
       summary: Verifica quais números têm WhatsApp (anti-ban)
-      parameters:
-        - in: header
-          name: X-Instance
-          schema: { type: string }
+      parameters: [{ $ref: "#/components/parameters/XInstance" }]
       requestBody:
         required: true
         content:
@@ -120,8 +327,33 @@ paths:
                 numbers: { type: array, items: { type: string } }
       responses:
         "200": { description: OK }
+  /wa/group/create:
+    post:
+      tags: [Recursos avançados]
+      summary: Cria um grupo
+      parameters: [{ $ref: "#/components/parameters/XInstance" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+                participants: { type: array, items: { type: string } }
+      responses:
+        "200": { description: Criado }
+  /wa/group/list:
+    get:
+      tags: [Recursos avançados]
+      summary: Lista os grupos
+      parameters: [{ $ref: "#/components/parameters/XInstance" }]
+      responses:
+        "200": { description: OK }
   /campaigns:
     post:
+      tags: [Campanhas]
       summary: Cria uma campanha (disparo em massa com anti-ban)
       requestBody:
         required: true
@@ -147,21 +379,47 @@ paths:
         "201": { description: Criada, devolve campaignId }
   /campaigns/{id}:
     get:
+      tags: [Campanhas]
       summary: Status de uma campanha
       parameters:
-        - in: path
-          name: id
-          required: true
-          schema: { type: string }
+        - { in: path, name: id, required: true, schema: { type: string } }
+      responses:
+        "200": { description: "OK — { state, sent, failed, total }" }
+        "404": { description: Não encontrada }
+  /campaigns/{id}/pause:
+    post:
+      tags: [Campanhas]
+      summary: Pausa uma campanha
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
       responses:
         "200": { description: OK }
-        "404": { description: Não encontrada }
+  /campaigns/{id}/resume:
+    post:
+      tags: [Campanhas]
+      summary: Retoma uma campanha pausada
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      responses:
+        "200": { description: OK }
+  /campaigns/{id}/cancel:
+    post:
+      tags: [Campanhas]
+      summary: Cancela uma campanha
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      responses:
+        "200": { description: OK }
   /contacts:
     get:
+      tags: [Contatos]
       summary: Lista contatos (filtra por tag com ?tag=)
+      parameters:
+        - { in: query, name: tag, required: false, schema: { type: string } }
       responses:
         "200": { description: OK }
     post:
+      tags: [Contatos]
       summary: Cria ou atualiza um contato
       requestBody:
         required: true
@@ -176,23 +434,67 @@ paths:
                 tags: { type: array, items: { type: string } }
       responses:
         "201": { description: OK }
-  /instances/{instance}/webhook:
+  /contacts/import:
     post:
-      summary: Configura o webhook para receber mensagens
-      parameters:
-        - in: path
-          name: instance
-          required: true
-          schema: { type: string }
+      tags: [Contatos]
+      summary: Importa vários contatos de uma vez
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [url]
               properties:
-                url: { type: string, example: "https://seu-sistema.com/webhook" }
-                enabled: { type: boolean, example: true }
+                text: { type: string, description: "uma linha por contato: numero,nome" }
+                rows:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      number: { type: string }
+                      name: { type: string }
+                tags: { type: array, items: { type: string } }
       responses:
-        "200": { description: Configurado }
+        "200": { description: "OK — { imported }" }
+  /funnels:
+    post:
+      tags: [Funil de grupos]
+      summary: Cria um funil de grupos (link que enche um grupo e pula pro próximo)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, instance, jids]
+              properties:
+                name: { type: string }
+                instance: { type: string }
+                jids: { type: array, items: { type: string } }
+                slug: { type: string }
+                capacity: { type: integer }
+                welcomeMsg: { type: string }
+                fullMessage: { type: string }
+      responses:
+        "201": { description: Criado }
+    get:
+      tags: [Funil de grupos]
+      summary: Lista os funis
+      responses:
+        "200": { description: OK }
+  /funnels/{id}/status:
+    get:
+      tags: [Funil de grupos]
+      summary: Status de um funil
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      responses:
+        "200": { description: OK }
+  /funnels/{id}:
+    delete:
+      tags: [Funil de grupos]
+      summary: Remove um funil
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      responses:
+        "200": { description: Removido }

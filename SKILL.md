@@ -50,6 +50,15 @@ Skill para operar o WhatsApp pela API REST do Visto Azul. Você fala só com est
 - `POST /v1/instances/{instance}/webhook` `{ "url": "https://seu-sistema.com/webhook", "enabled": true }`
 - A partir daí, cada mensagem recebida chega como POST na sua URL. Ideal para responder com IA (ex.: Claude).
 
+### Baixar mídia recebida e ações na conversa
+O `id` da mensagem vem no webhook. Todas levam `{ "instance", … }` no corpo.
+- Baixar mídia: `POST /v1/messages/media` `{ "instance", "id", "transcribe": true }` → `{ "base64", "mimetype", "transcription" }` (áudio pode vir transcrito).
+- Marcar como lida: `POST /v1/messages/read` `{ "instance", "id" }`.
+- Presença: `POST /v1/messages/presence` `{ "instance", "number", "presence": "composing" }` (composing/recording/paused).
+- Reagir: `POST /v1/messages/react` `{ "instance", "number", "id", "emoji": "..." }`.
+- Editar: `POST /v1/messages/edit` `{ "instance", "id", "text" }`.
+- Apagar: `POST /v1/messages/delete` `{ "instance", "id" }`.
+
 ## Respostas de erro
 `401` API key ausente/inválida · `402` assinatura inativa · `403` sem permissão / limite do plano · `400` parâmetro faltando.
 
