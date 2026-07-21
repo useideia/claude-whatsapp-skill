@@ -17,7 +17,7 @@ O jeito mais rápido. Conecta a Visto Azul direto no seu assistente de IA e voc�
 - **Cursor / Windsurf / VS Code:** no `mcp.json`, `"vistoazul": { "url": "https://mcp.vistoazul.com.br/mcp" }`
 - Autenticação por **OAuth** (login com a sua conta Visto Azul). Sem API key manual.
 
-**Ferramentas do MCP:** conectar número (QR), listar/ler conversas ao vivo, enviar texto / mídia / PIX / enquete-botões-menu, mostrar "digitando", reagir, marcar como lida, campanha (criar / listar / status / pausar / retomar / cancelar), contatos e funil (kanban), criar grupo, templates, catálogo e status da conta.
+**Ferramentas do MCP (32):** conectar número (QR), listar/ler conversas ao vivo, transcrever áudio recebido, enviar texto / mídia / PIX / enquete-botões-menu, mostrar "digitando", reagir, marcar como lida, editar e apagar mensagem, validar quem tem WhatsApp (anti-ban), campanha (criar / listar / status / pausar / retomar / cancelar), contatos e funil (kanban), criar grupo e ver dados do grupo, conectar Chatwoot, templates, catálogo e status da conta.
 
 Guia completo: https://vistoazul.com.br/docs/mcp.html
 
